@@ -8,5 +8,6 @@ setup(
     license='GNU LESSER GENERAL PUBLIC LICENSE - Version 2.1, February 1999',
     author='Joaci Morais',
     author_email='joaci.morais@gmail.com',
-    description='A Fast-Asynchronous-microService-Environment based on ZeroMQ.'
+    description='A Fast-Asynchronous-microService-Environment based on ZeroMQ.',
+    install_requires=['zmq']
 )
