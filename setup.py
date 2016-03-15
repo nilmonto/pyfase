@@ -3,7 +3,6 @@ from setuptools import setup
 setup(
     name='pyfase',
     version='1.0.0',
-    packages=[''],
     url='https://github.com/jomorais/pyfase',
     license='GPLv3',
     author='Joaci Morais',
