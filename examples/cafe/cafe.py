@@ -3,13 +3,13 @@ __author__ = 'joaci'
 
 try:
     import os
-    from fase import MicroService
+    from fase import MicroServiceBase
 except Exception as e:
     print('require module exception: %s' % e)
     exit(0)
 
 
-class Cafe(MicroService):
+class Cafe(MicroServiceBase):
     def __init__(self):
         super(Cafe, self).__init__(self, sender_endpoint='ipc:///tmp/sender', receiver_endpoint='ipc:///tmp/receiver')
 
@@ -23,7 +23,7 @@ class Cafe(MicroService):
     def on_new_service(self, service, actions):
         print('### on_new_service ### service: %s - actions: %s' % (service, actions))
 
-    @MicroService.action
+    @MicroServiceBase.action
     def make_coffee(self, service, data):
         print('### making some %s coffee to %s ' % (data['type'], service))
         self.request_action('drink_coffee', {'coffee': 'this is awesome coffee'})

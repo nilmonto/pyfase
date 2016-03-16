@@ -3,13 +3,13 @@ __author__ = 'joaci'
 
 try:
     import time
-    from fase import MicroService
+    from fase import MicroServiceBase
 except Exception as e:
     print('require module exception: %s' % e)
     exit(0)
 
 
-class Pong(MicroService):
+class Pong(MicroServiceBase):
     def __init__(self):
         super(Pong, self).__init__(self, sender_endpoint='ipc:///tmp/sender', receiver_endpoint='ipc:///tmp/receiver')
 
@@ -17,7 +17,7 @@ class Pong(MicroService):
         print('### on_connect ###')
         self.request_action('ping', {})
 
-    @MicroService.action
+    @MicroServiceBase.action
     def pong(self, service, data):
         print('### service: %s request a pong ###' % service)
         time.sleep(2)

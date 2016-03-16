@@ -15,6 +15,7 @@ try:
     import zmq
     from threading import Thread
     from json import loads, dumps
+    from abc import ABCMeta, abstractmethod
 except Exception as requirement_exception:
     print('requirements exception: %s' % requirement_exception)
     exit(0)
@@ -38,7 +39,9 @@ class Fase(object):
             os.kill(os.getpid(), signal.SIGKILL)
 
 
-class MicroService(object):
+class MicroServiceBase(object):
+    __metaclass__ = ABCMeta
+
     __slots__ = ('name', 'log', 'actions', 'tasks', 'ctx', 'sender', 'receiver')
 
     def __init__(self, service, sender_endpoint, receiver_endpoint):
@@ -82,12 +85,15 @@ class MicroService(object):
     def exit():
         os.kill(os.getpid(), signal.SIGKILL)
 
+    @abstractmethod
     def on_connect(self):
         pass
 
+    @abstractmethod
     def on_broadcast(self, service, data):
         pass
 
+    @abstractmethod
     def on_new_service(self, service, actions):
         pass
 
