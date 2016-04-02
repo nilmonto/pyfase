@@ -1,8 +1,8 @@
-from setuptools import setup
+from distutils.core import setup
 
 setup(
     name='pyfase',
-    version='1.0.0',
+    version='1.0.1',
     packages=[''],
     url='https://github.com/jomorais/pyfase',
     license='GPLv3',
