@@ -1,7 +1,6 @@
 import os
 import sys
 from setuptools import setup, find_packages
-from fase import __version__, __author__
 
 if sys.argv[-1] == 'publish':
     os.system('python setup.py sdist upload -r pypi')
@@ -9,8 +8,8 @@ if sys.argv[-1] == 'publish':
 
 dist = setup(
     name='pyfase',
-    version=__version__,
-    author=__author__,
+    version='1.0.1',
+    author='Joaci Morais',
     author_email='joaci.morais@gmail.com',
     packages=find_packages(),
     platforms='any',
