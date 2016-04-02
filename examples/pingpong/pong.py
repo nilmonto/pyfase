@@ -17,6 +17,12 @@ class Pong(MicroServiceBase):
         print('### on_connect ###')
         self.request_action('ping', {})
 
+    def on_broadcast(self, service, data):
+        pass
+
+    def on_new_service(self, service, actions):
+        pass
+
     @MicroServiceBase.action
     def pong(self, service, data):
         print('### service: %s request a pong ###' % service)
