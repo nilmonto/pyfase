@@ -6,6 +6,7 @@
 """
 
 __author__ = 'Joaci Morais'
+__version__ = '1.0.1'
 
 try:
     import os
