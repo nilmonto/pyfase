@@ -1,7 +1,7 @@
 __author__ = 'jmorais'
 
 try:
-    from fase import Fase
+    from pyfase import Fase
 except Exception as e:
     print('require module exception: %s' % e)
     exit(0)

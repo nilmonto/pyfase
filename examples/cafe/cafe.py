@@ -3,7 +3,7 @@ __author__ = 'joaci'
 
 try:
     import os
-    from fase import MicroService
+    from pyfase import MicroService
 except Exception as e:
     print('require module exception: %s' % e)
     exit(0)
