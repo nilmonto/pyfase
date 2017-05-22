@@ -122,7 +122,7 @@ class MicroService(object):
                 elif '<b>:' in pkg:  # IS A BROADCAST PACKAGE!
                     o_pkg = loads(pkg[4:])
                     service = o_pkg['s']
-                    if self.name not in service:
+                    if self.name != service:
                         self.on_broadcast(service, o_pkg['d'])
                 else:  # IS AN ACTION PACKAGE!
                     pos = pkg.find(':')
