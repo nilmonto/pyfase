@@ -115,14 +115,14 @@ class MicroService(object):
                 if '<r>:' in pkg:  # IS A REGISTER PACKAGE!
                     o_pkg = loads(pkg[4:])
                     service = o_pkg['s']
-                    if self.name in service:
+                    if self.name == service:
                         self.on_connect()
                     else:
                         self.on_new_service(service, o_pkg['a'])
                 elif '<b>:' in pkg:  # IS A BROADCAST PACKAGE!
                     o_pkg = loads(pkg[4:])
                     service = o_pkg['s']
-                    if self.name not in service:
+                    if self.name != service:
                         self.on_broadcast(service, o_pkg['d'])
                 else:  # IS AN ACTION PACKAGE!
                     pos = pkg.find(':')
