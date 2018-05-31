@@ -39,7 +39,7 @@ class Fase(object):
 
 
 class MicroService(object):
-    __slots__ = ('name', 'log', 'actions', 'tasks', 'ctx', 'sender', 'receiver')
+    __slots__ = ('name', 'log', 'actions', 'tasks', 'ctx', 'sender', 'receiver', 'o_pkg', 'action_context')
 
     def __init__(self, service, sender_endpoint, receiver_endpoint):
         if inspect.isclass(type(service)):
@@ -51,10 +51,14 @@ class MicroService(object):
             self.sender.connect(receiver_endpoint)
             self.receiver = self.ctx.socket(zmq.SUB)
             self.receiver.connect(sender_endpoint)
+            self.o_pkg = {}
+            self.action_context = False
             """ filter <r> packages: Notify when a new Micro-Service is available """
             self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'<r>:')
             """ filter <b> packages: Broadcast packages  """
             self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'<b>:')
+            """ filter response packages: Notify when receive an response from an action previous requested """
+            self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'%s:' % self.name)
             for name, func in service.__class__.__dict__.items():
                 if hasattr(func, '__call__'):  # IS A FUNCTION?
                     if '_action_wrapper_' in func.__name__:  # IS AN ACTION?
@@ -91,6 +95,9 @@ class MicroService(object):
     def on_new_service(self, service, actions):
         pass
 
+    def on_response(self, service, data):
+        pass
+
     def start_task(self, task_name, data):
         if task_name in self.tasks:
             Thread(target=self.tasks[task_name], name=task_name, args=data).start()
@@ -103,6 +110,10 @@ class MicroService(object):
     def request_action(self, action, data):
         self.sender.send_string('%s:%s' % (action, dumps({'s': self.name, 'd': data})), zmq.NOBLOCK)
 
+    def response(self, data):
+        if self.action_context:
+            self.sender.send_string('%s:%s' % (self.o_pkg['s'], dumps({'s': self.name, 'd': data})), zmq.NOBLOCK)
+
     def execute(self, enable_tasks=None):
         try:
             if enable_tasks:
@@ -113,21 +124,27 @@ class MicroService(object):
             while True:
                 pkg = self.receiver.recv_string()
                 if '<r>:' in pkg:  # IS A REGISTER PACKAGE!
-                    o_pkg = loads(pkg[4:])
-                    service = o_pkg['s']
+                    self.o_pkg = loads(pkg[4:])
+                    service = self.o_pkg['s']
                     if self.name == service:
                         self.on_connect()
                     else:
-                        self.on_new_service(service, o_pkg['a'])
+                        self.on_new_service(service, self.o_pkg['a'])
                 elif '<b>:' in pkg:  # IS A BROADCAST PACKAGE!
-                    o_pkg = loads(pkg[4:])
-                    service = o_pkg['s']
+                    self.o_pkg = loads(pkg[4:])
+                    service = self.o_pkg['s']
                     if self.name != service:
-                        self.on_broadcast(service, o_pkg['d'])
+                        self.on_broadcast(service, self.o_pkg['d'])
+                elif '%s:' % self.name in pkg:  # IS A RESPONSE PACKAGE!
+                    pos = pkg.find(':')
+                    self.o_pkg = loads(pkg[pos+1:])
+                    self.on_response(self.o_pkg['s'], self.o_pkg['d'])
                 else:  # IS AN ACTION PACKAGE!
                     pos = pkg.find(':')
-                    o_pkg = loads(pkg[pos+1:])
-                    self.actions[pkg[:pos]](self, o_pkg['s'], o_pkg['d'])
+                    self.o_pkg = loads(pkg[pos+1:])
+                    self.action_context = True
+                    self.actions[pkg[:pos]](self, self.o_pkg['s'], self.o_pkg['d'])
+                    self.action_context = False
         except Exception and KeyboardInterrupt as execute_exception:
             print('execute exception: %s' % execute_exception)
             os.kill(os.getpid(), signal.SIGKILL)
