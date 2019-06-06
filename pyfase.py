@@ -13,6 +13,8 @@ try:
     import signal
     import inspect
     import zmq
+    if sys.version_info[0] >= 3:
+        import zmq.asyncio
     from threading import Thread
     from json import loads, dumps
 except Exception as requirement_exception:
@@ -39,36 +41,65 @@ class Fase(object):
 
 
 class MicroService(object):
-    __slots__ = ('name', 'log', 'actions', 'tasks', 'ctx', 'sender', 'receiver', 'o_pkg', 'action_context')
+    __slots__ = ('name', 'log', 'actions', 'tasks', 'ctx', 'sender', 'receiver', 'o_pkg', 'action_context',
+                 'receiver_endpoint','sender_endpoint', 'service')
 
     def __init__(self, service, sender_endpoint, receiver_endpoint):
         if inspect.isclass(type(service)):
             self.name = service.__class__.__name__
             self.actions = {}
             self.tasks = {}
-            self.ctx = zmq.Context()
-            self.sender = self.ctx.socket(zmq.PUSH)
-            self.sender.connect(receiver_endpoint)
-            self.receiver = self.ctx.socket(zmq.SUB)
-            self.receiver.connect(sender_endpoint)
-            self.o_pkg = {}
-            self.action_context = False
-            """ filter <r> packages: Notify when a new Micro-Service is available """
-            self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'<r>:')
-            """ filter <b> packages: Broadcast packages  """
-            self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'<b>:')
-            """ filter response packages: Notify when receive an response from an action previous requested """
-            self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'%s:' % self.name)
-            for name, func in service.__class__.__dict__.items():
-                if hasattr(func, '__call__'):  # IS A FUNCTION?
-                    if '_action_wrapper_' in func.__name__:  # IS AN ACTION?
-                        self.actions[name] = func
-                        """ filter only actions defined on this Micro-Service """
-                        self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'%s:' % name)
-                    elif '_task_wrapper_' in func.__name__:  # IS A TASK?
-                        self.tasks[name] = func
+            self.sender_endpoint = sender_endpoint
+            self.receiver_endpoint = receiver_endpoint
+            self.service = service
         else:
             raise Exception('MicroService %s must be a class' % service)
+
+    def _init_sync(self):
+        self.ctx = zmq.Context()
+        self.sender = self.ctx.socket(zmq.PUSH)
+        self.sender.connect(self.receiver_endpoint)
+        self.receiver = self.ctx.socket(zmq.SUB)
+        self.receiver.connect(self.sender_endpoint)
+        self.o_pkg = {}
+        self.action_context = False
+        """ filter <r> packages: Notify when a new Micro-Service is available """
+        self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'<r>:')
+        """ filter <b> packages: Broadcast packages  """
+        self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'<b>:')
+        """ filter response packages: Notify when receive an response from an action previous requested """
+        self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'%s:' % self.name)
+        for name, func in self.service.__class__.__dict__.items():
+            if hasattr(func, '__call__'):  # IS A FUNCTION?
+                if '_action_wrapper_' in func.__name__:  # IS AN ACTION?
+                    self.actions[name] = func
+                    """ filter only actions defined on this Micro-Service """
+                    self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'%s:' % name)
+                elif '_task_wrapper_' in func.__name__:  # IS A TASK?
+                    self.tasks[name] = func
+
+    def _init_async(self):
+        self.ctx = zmq.asyncio.Context()
+        self.sender = self.ctx.socket(zmq.PUSH)
+        self.sender.connect(self.receiver_endpoint)
+        self.receiver = self.ctx.socket(zmq.SUB)
+        self.receiver.connect(self.sender_endpoint)
+        self.o_pkg = {}
+        self.action_context = False
+        """ filter <r> packages: Notify when a new Micro-Service is available """
+        self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'<r>:')
+        """ filter <b> packages: Broadcast packages  """
+        self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'<b>:')
+        """ filter response packages: Notify when receive an response from an action previous requested """
+        self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'%s:' % self.name)
+        for name, func in self.service.__class__.__dict__.items():
+            if hasattr(func, '__call__'):  # IS A FUNCTION?
+                if '_action_wrapper_' in func.__name__:  # IS AN ACTION?
+                    self.actions[name] = func
+                    """ filter only actions defined on this Micro-Service """
+                    self.receiver.setsockopt_string(zmq.SUBSCRIBE, u'%s:' % name)
+                elif '_task_wrapper_' in func.__name__:  # IS A TASK?
+                    self.tasks[name] = func
 
     @staticmethod
     def action(function):
@@ -79,6 +110,18 @@ class MicroService(object):
     @staticmethod
     def task(function):
         def _task_wrapper_(*args, **kwargs):
+            return function(*args, **kwargs)
+        return _task_wrapper_
+
+    @staticmethod
+    def async_action(function):
+        async def _action_wrapper_(*args, **kwargs):
+            return function(*args, **kwargs)
+        return _action_wrapper_
+
+    @staticmethod
+    def async_task(function):
+        async def _task_wrapper_(*args, **kwargs):
             return function(*args, **kwargs)
         return _task_wrapper_
 
@@ -116,6 +159,7 @@ class MicroService(object):
 
     def execute(self, enable_tasks=None):
         try:
+            self._init_sync()
             if enable_tasks:
                 for name, task in self.tasks.items():
                     Thread(target=task, name=name, args=(self,)).start()
@@ -144,6 +188,42 @@ class MicroService(object):
                     self.o_pkg = loads(pkg[pos+1:])
                     self.action_context = True
                     self.actions[pkg[:pos]](self, self.o_pkg['s'], self.o_pkg['d'])
+                    self.action_context = False
+        except Exception and KeyboardInterrupt as execute_exception:
+            print('execute exception: %s' % execute_exception)
+            os.kill(os.getpid(), signal.SIGKILL)
+
+    async def async_execute(self, enable_tasks=None):
+        try:
+            self._init_async()
+            if enable_tasks:
+                for name, task in self.tasks.items():
+                    Thread(target=task, name=name, args=(self,)).start()
+            self.sender.send_string('<r>:%s' % dumps({'s': self.name,
+                                                      'a': [action for action in self.actions]}), zmq.NOBLOCK)
+            while True:
+                pkg = await self.receiver.recv_string()
+                if '<r>:' in pkg:  # IS A REGISTER PACKAGE!
+                    self.o_pkg = loads(pkg[4:])
+                    service = self.o_pkg['s']
+                    if self.name == service:
+                        self.on_connect()
+                    else:
+                        self.on_new_service(service, self.o_pkg['a'])
+                elif '<b>:' in pkg:  # IS A BROADCAST PACKAGE!
+                    self.o_pkg = loads(pkg[4:])
+                    service = self.o_pkg['s']
+                    if self.name != service:
+                        self.on_broadcast(service, self.o_pkg['d'])
+                elif '%s:' % self.name in pkg:  # IS A RESPONSE PACKAGE!
+                    pos = pkg.find(':')
+                    self.o_pkg = loads(pkg[pos+1:])
+                    self.on_response(self.o_pkg['s'], self.o_pkg['d'])
+                else:  # IS AN ACTION PACKAGE!
+                    pos = pkg.find(':')
+                    self.o_pkg = loads(pkg[pos+1:])
+                    self.action_context = True
+                    await self.actions[pkg[:pos]](self, self.o_pkg['s'], self.o_pkg['d'])
                     self.action_context = False
         except Exception and KeyboardInterrupt as execute_exception:
             print('execute exception: %s' % execute_exception)
