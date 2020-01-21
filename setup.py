@@ -11,7 +11,7 @@ setup(
     packages=find_packages(),
     py_modules=['pyfase'],
     platforms='any',
-    install_requires=['zmq'],
+    install_requires=['pyzmq'],
     classifiers=[
         "Programming Language :: Python",
         "Programming Language :: Python :: 2.7",
